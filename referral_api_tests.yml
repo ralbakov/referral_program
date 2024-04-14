@@ -1,0 +1,39 @@
+version: "3.10"
+services:
+
+  testdb:
+    image: postgres:15.1-alpine
+    container_name: testdb
+    env_file:
+      - .env_test
+    healthcheck:
+      test: /bin/bash -c "pg_isready -d testdb -U someuser"
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    env_file:
+      - .env_test
+    depends_on:
+      - testdb
+    healthcheck:
+      test: /bin/bash -c "redis-cli ping"
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  test_api:
+    build:
+      context: .
+    container_name: test_api
+    env_file:
+      - .env_test
+    depends_on:
+      testdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: /bin/bash -c "python create_key.py && pytest -v -s"
