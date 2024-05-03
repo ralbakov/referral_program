@@ -108,7 +108,7 @@ async def test_create_referral_code_alredy_exist(
     )
     assert response.status_code == HTTPStatus.CONFLICT
     assert response.json() == {
-        'detail': f" Refarral code alredy exist. Your code: '{save_response_data.get('referal_code')}' "}
+        'detail': f"Refarral code alredy exist. Your code: '{save_response_data.get('referal_code')}'"}
 
 
 async def test_registration_user_with_code(
