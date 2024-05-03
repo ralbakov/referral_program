@@ -4,10 +4,10 @@ import uvicorn
 from fastapi import FastAPI
 
 # from src.database.config import init_db
-from src.auth.router import auth_router
+from src.api.auth.router import auth_router
+from src.api.info.router import info_router
+from src.api.user.router import user_router
 from src.database.redis_tools import RedisCache
-from src.info.router import info_router
-from src.user.router import user_router
 
 
 @asynccontextmanager

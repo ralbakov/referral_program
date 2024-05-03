@@ -1,7 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
-from src.auth.schemas import ChangePassword, Token, UserRegistration
-from src.auth.service import ResetPasswordService, TokenService, UserRegistrationService
+from src.api.auth.schemas import ChangePassword, Token, UserRegistration
+from src.api.auth.service import (
+    ResetPasswordService,
+    TokenService,
+    UserRegistrationService,
+)
 from src.database.schemas import User
 
 auth_router = APIRouter(prefix='/auth', tags=['AUTH'])
@@ -14,11 +18,12 @@ auth_router = APIRouter(prefix='/auth', tags=['AUTH'])
     summary='Зарегистрировать пользователя',
 )
 async def registration(
+    background_tasks: BackgroundTasks,
     data: UserRegistration = Depends(),
     service: UserRegistrationService = Depends()
 ) -> User:
     try:
-        return await service.create(data)
+        return await service.create(data, background_tasks)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -48,9 +53,13 @@ async def login_for_access_jwt(service: TokenService = Depends()) -> Token:
     status_code=status.HTTP_200_OK,
     summary='Отправить ключ для сброса пароля',
 )
-async def resetpassword(email: str, service: ResetPasswordService = Depends()) -> dict:
+async def resetpassword(
+    background_tasks: BackgroundTasks,
+    email: str,
+    service: ResetPasswordService = Depends()
+) -> dict:
     try:
-        await service.send_reset_key(email.strip())
+        background_tasks.add_task(service.send_reset_key, email.strip())
         return {'detail': 'Key for reset password has been sent to your email.'}
     except ValueError as e:
         raise HTTPException(
@@ -64,12 +73,16 @@ async def resetpassword(email: str, service: ResetPasswordService = Depends()) -
     status_code=status.HTTP_200_OK,
     summary='Изменить забытый пароль с помощью ключа',
 )
-async def change_password_with_key(data: ChangePassword = Depends(), service: ResetPasswordService = Depends()) -> dict:
+async def change_password_with_key(
+    background_tasks: BackgroundTasks,
+    data: ChangePassword = Depends(),
+    service: ResetPasswordService = Depends()
+) -> dict:
     try:
-        await service.change_password(data)
-        return {'detail': 'Password update'}
+        await service.change_password(data, background_tasks)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=e.args[0],
         )
+    return {'detail': 'Password update'}

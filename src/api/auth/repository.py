@@ -1,12 +1,12 @@
 from datetime import datetime
 
 from fastapi import Depends
-from sqlalchemy import and_, select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth import utils as auth_utils
-from src.auth.schemas import ChangePassword, UserRegistration
+from src.api.auth import utils as auth_utils
+from src.api.auth.schemas import ChangePassword, UserRegistration
 from src.database.config import get_async_session
 from src.database.models import ResetPass, User
 
@@ -78,15 +78,6 @@ class ResetPasswordRepository:
         ).scalar()
         if not result:
             raise ValueError('Email not found')
-        check_key = (
-            await self.session.execute(
-                select(ResetPass.resetkey).where(
-                    ResetPass.email == email
-                )
-            )
-        ).scalar()
-        if check_key:
-            return str(check_key)
         result = ResetPass(email=email)
         self.session.add(result)
         try:
@@ -95,27 +86,37 @@ class ResetPasswordRepository:
             raise ValueError(e.args[0])
         return str(result.resetkey)
 
-    async def change_password(self, data: ChangePassword) -> None:
+    async def change_password(self, data: ChangePassword) -> User:
         '''Изменить пароль'''
         try:
             result = (
                 await self.session.execute(
                     select(User).join(ResetPass)
-                    .where(
-                        and_(
-                            ResetPass.email == data.email,
-                            ResetPass.resetkey == data.resetkey
-                        )
-                    )
+                    .where(User.email == ResetPass.email)
+                    .where(ResetPass.resetkey == data.resetkey)
                 )
             ).scalar()
         except DBAPIError:
-            raise ValueError('Key not found or invalid')
+            raise ValueError('Key invalid')
         if not result:
-            raise ValueError('Email not found or invalid')
+            raise ValueError('Email or key not found or invalid')
         result.hashed_password = auth_utils.hash_password(data.new_password)
         try:
             await self.session.merge(result)
+            await self.session.commit()
+        except IntegrityError as e:
+            raise ValueError(e.args[0])
+        await self.delete_reset_key(data.resetkey)
+        return result
+
+    async def delete_reset_key(self, key: str) -> None:
+        '''Удаляет ключ для сброса'''
+        await self.session.execute(
+            delete(ResetPass).where(
+                ResetPass.resetkey == key
+            )
+        )
+        try:
             await self.session.commit()
         except IntegrityError as e:
             raise ValueError(e.args[0])

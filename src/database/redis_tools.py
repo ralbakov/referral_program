@@ -23,9 +23,9 @@ class RedisCache(metaclass=MetaSingleton):
         if self._redis is None:
             self._redis = aioredis.from_url(settings.cache.url)
 
-    async def set_user(self, username: str, item: User) -> None:
+    async def set_user(self, item: User) -> None:
         await self._redis.set(  # type: ignore
-            username,
+            item.username,
             pickle.dumps(item),
             ex=settings.cache.exp_second_set
         )
@@ -41,9 +41,9 @@ class RedisCache(metaclass=MetaSingleton):
         await self._redis.delete(username)  # type: ignore
         return None
 
-    async def set_email_user(self, email: str, item: User) -> None:
+    async def set_email_user(self, item: User) -> None:
         await self._redis.set(  # type: ignore
-            email,
+            item.email,
             pickle.dumps(item),
             ex=300
         )

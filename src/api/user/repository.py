@@ -5,11 +5,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth.utils import hash_password
+from src.api.auth.utils import hash_password
+from src.api.user.schemas import UserUpdate
+from src.api.user.utils import generate_ref_code
 from src.database.config import get_async_session
 from src.database.models import User
-from src.user.schemas import UserUpdate
-from src.user.utils import generate_ref_code
 
 
 class UserRepository:
@@ -48,7 +48,8 @@ class UserRepository:
         '''Создать реферальный код'''
         now = datetime.now()
         if user.referal_code and user.exp_ref_code > now:
-            raise ValueError(f" Refarral code alredy exist. Your code: '{user.referal_code}' ")
+            raise ValueError(f" Refarral code alredy exist. Your code: '{
+                             user.referal_code}' ")
         if expire_timedelta_day:
             expire = now + timedelta(days=expire_timedelta_day)
         else:

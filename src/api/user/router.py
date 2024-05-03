@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from jwt import InvalidTokenError
 
+from src.api.user.schemas import ReferralCode, UserUpdate
+from src.api.user.service import UserService
 from src.database.schemas import User
-from src.user.schemas import ReferralCode, UserUpdate
-from src.user.service import UserService
 
 user_router = APIRouter(prefix='/auth/user/me', tags=['USER'])
 
@@ -36,11 +36,12 @@ async def read(service: UserService = Depends()) -> User:
     summary='Обновить информацию авторизованного пользователя',
 )
 async def update(
+    background_tasks: BackgroundTasks,
     data: UserUpdate = Depends(),
     service: UserService = Depends()
 ) -> User:
     try:
-        return await service.update(data)
+        return await service.update(data, background_tasks)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -58,9 +59,12 @@ async def update(
     status_code=status.HTTP_200_OK,
     summary='Деактивировать авторизованного пользователя (отключить)',
 )
-async def deactivate(service: UserService = Depends()) -> dict:
+async def deactivate(
+    background_tasks: BackgroundTasks,
+    service: UserService = Depends()
+) -> dict:
     try:
-        await service.deactivate()
+        await service.deactivate(background_tasks)
         return {'detail': 'Username is deleted'}
     except ValueError as e:
         raise HTTPException(
@@ -76,11 +80,12 @@ async def deactivate(service: UserService = Depends()) -> dict:
     summary='Создать реферальный код авторизованного пользователя, cо сроком действия (по умолчанию 30 дней)',
 )
 async def create_referral_code(
+    background_tasks: BackgroundTasks,
     expire_timedelta_day: str | int = 30,
     service: UserService = Depends(),
 ):
     try:
-        return await service.create_ref_code(int(expire_timedelta_day))
+        return await service.create_ref_code(int(expire_timedelta_day), background_tasks)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -98,9 +103,12 @@ async def create_referral_code(
     status_code=status.HTTP_200_OK,
     summary='Удалить реферальный код авторизованного пользователя'
 )
-async def delete_referral_code(service: UserService = Depends()) -> dict:
+async def delete_referral_code(
+    background_tasks: BackgroundTasks,
+    service: UserService = Depends()
+) -> dict:
     try:
-        await service.delete_ref_code()
+        await service.delete_ref_code(background_tasks)
         return {'detail': 'Referral code is deleted'}
     except ValueError as e:
         raise HTTPException(
@@ -115,9 +123,12 @@ async def delete_referral_code(service: UserService = Depends()) -> dict:
     status_code=status.HTTP_200_OK,
     summary='Получить всех рефералов авторизованного пользователя',
 )
-async def get_all_referrals(service: UserService = Depends()) -> list[User]:
+async def get_all_referrals(
+    background_tasks: BackgroundTasks,
+    service: UserService = Depends()
+) -> list[User]:
     try:
-        return await service.get_all_referral()
+        return await service.get_all_referral(background_tasks)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

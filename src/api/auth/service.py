@@ -1,10 +1,10 @@
-from fastapi import Depends
+from fastapi import BackgroundTasks, Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt.exceptions import InvalidTokenError
 
-from src.auth import utils as auth_utils
-from src.auth.repository import ResetPasswordRepository, UserAuthRepository
-from src.auth.schemas import ChangePassword, Token, UserRegistration
+from src.api.auth import utils as auth_utils
+from src.api.auth.repository import ResetPasswordRepository, UserAuthRepository
+from src.api.auth.schemas import ChangePassword, Token, UserRegistration
 from src.database.models import User
 from src.database.redis_tools import RedisCache
 
@@ -27,15 +27,16 @@ class UserRegistrationService:
     async def create(
         self,
         user: UserRegistration,
+        background_tasks: BackgroundTasks
     ) -> User:
         '''Создать пользователя'''
         result = await self.repository.create(user)
-        await self.cache_repo.set_user(result.username, result)
+        background_tasks.add_task(self.cache_repo.set_user, result)
         return result
 
 
 class UserAuthService:
-    '''Сервис для авторизации пользователя'''
+    '''Сервис для аутентификации пользователя'''
 
     __slots__ = ['repository', 'form_data', 'cache_repo']
 
@@ -49,7 +50,7 @@ class UserAuthService:
         self.form_data = form_data
         self.cache_repo = RedisCache()
 
-    async def validate_auth_user(self) -> User:
+    async def validate_auth_user(self, background_tasks: BackgroundTasks) -> User:
         '''Проверка данных пользователя'''
         user = await self.repository.read(self.form_data.username.strip())
         if not user:
@@ -63,7 +64,7 @@ class UserAuthService:
 
         if not user.is_active:
             raise ValueError('User not found')
-        await self.cache_repo.set_user(self.form_data.username.strip(), user)
+        background_tasks.add_task(self.cache_repo.set_user, user)
         return user
 
 
@@ -73,13 +74,14 @@ class TokenService:
 
     def __init__(
         self,
+        background_tasks: BackgroundTasks,
         user: UserAuthService = Depends()
     ):
-        self.__user = user
+        self.__user = user.validate_auth_user(background_tasks)
 
     async def create_access_jwt(self) -> Token:
         '''Создать токен'''
-        auth_user = await self.__user.validate_auth_user()
+        auth_user = await self.__user
         jwt_payload = {
             'sub': str(auth_user.id),
             'username': auth_user.username,
@@ -115,7 +117,7 @@ class CurrentSessionService:
             raise InvalidTokenError(f'Invalid token error: {e}')
         return payload
 
-    async def get_auth_user(self) -> User:
+    async def get_auth_user(self, background_tasks: BackgroundTasks) -> User:
         '''Проверить авторизацию пользователя'''
         payload = await self.get_token_payload()
         username: str | None = payload.get('username')
@@ -126,13 +128,13 @@ class CurrentSessionService:
             return cache
         user = await self.repository.read(username)
         if user:
-            await self.cache_repo.set_user(username, user)
+            background_tasks.add_task(self.cache_repo.set_user, user)
             return user
         raise InvalidTokenError('Invalid token error: User not found')
 
-    async def get_active_auth_user(self) -> User:
+    async def get_active_auth_user(self, background_tasks: BackgroundTasks) -> User:
         '''Проверить активен ли пользователь'''
-        user = await self.get_auth_user()
+        user = await self.get_auth_user(background_tasks)
         if user.is_active:
             return user
         raise ValueError('User not found')
@@ -141,7 +143,7 @@ class CurrentSessionService:
 class ResetPasswordService:
     '''Сервис для сброса пароля'''
 
-    __slots__ = ['repository']
+    __slots__ = ['repository', 'cache_repo']
 
     def __init__(
         self,
@@ -149,6 +151,7 @@ class ResetPasswordService:
     ) -> None:
 
         self.repository = repository
+        self.cache_repo = RedisCache()
 
     async def create_reset_key(
         self,
@@ -163,16 +166,23 @@ class ResetPasswordService:
     async def send_reset_key(
         self,
         email: str,
+        background_tasks: BackgroundTasks
     ) -> None:
         '''Отправить ключ для сброса пароля'''
         key = await self.create_reset_key(email)
-        auth_utils.send_key_for_reset_password(email, key)
+        background_tasks(auth_utils.send_key_for_reset_password,
+                         email=email, key=key)
         return None
 
     async def change_password(
         self,
         data: ChangePassword,
+        background_tasks: BackgroundTasks
     ) -> None:
         '''Изменить пароль'''
-        await self.repository.change_password(data)
+        try:
+            result = await self.repository.change_password(data)
+        except ValueError as e:
+            raise e
+        background_tasks.add_task(self.cache_repo.set_user, result)
         return None

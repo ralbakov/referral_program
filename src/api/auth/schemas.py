@@ -22,6 +22,5 @@ class UserRegistration(BaseModel):
 class ChangePassword(BaseModel):
     model_config = ConfigDict(strict=True, str_strip_whitespace=True)
 
-    email: EmailStr
     resetkey: StrictStr
     new_password: StrictStr

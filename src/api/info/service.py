@@ -1,9 +1,9 @@
 import httpx
-from fastapi import Depends
+from fastapi import BackgroundTasks, Depends
 
+from src.api.info.repository import InfoRepository
 from src.database.models import User
 from src.database.redis_tools import RedisCache
-from src.info.repository import InfoRepository
 
 
 class ReceiveCodeEmailService:
@@ -17,7 +17,7 @@ class ReceiveCodeEmailService:
         self.repository = repository
         self.cache_repo = RedisCache()
 
-    async def get_code(self, email: str) -> User:
+    async def get_code(self, email: str, background_tasks: BackgroundTasks) -> User:
         '''Получить реферальный код'''
         cache = await self.cache_repo.get_email_user(email)
         if cache:
@@ -27,7 +27,7 @@ class ReceiveCodeEmailService:
                 user = await self.repository.read_user_at_email(email)
             except ValueError as e:
                 raise e
-        await self.cache_repo.set_email_user(email, user)
+        background_tasks.add_task(self.cache_repo.set_email_user, user)
         return user
 
 
@@ -42,14 +42,15 @@ class InfoService:
         self.repository = repository
         self.cache_repo = RedisCache()
 
-    async def about_referrals(self, id: str) -> list[User]:
+    async def about_referrals(self, id: str, background_tasks: BackgroundTasks) -> list[User]:
         '''Получить информацию о рефералах по id рефера'''
         cache = await self.cache_repo.get_about_referrals_with_id(id)
         if cache:
             return cache
         result = await self.repository.get_users_id_referal(id)
         if result != []:
-            await self.cache_repo.set_about_referrals_with_id(id, result)
+            background_tasks.add_task(
+                self.cache_repo.set_about_referrals_with_id, id=id, items=result)
             return result
         raise ValueError('Referrals not found')
 

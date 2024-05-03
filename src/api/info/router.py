@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
-from src.info.schemas import ReferralCodeInfo, UserInfo
-from src.info.service import EmailHunter, InfoService, ReceiveCodeEmailService
+from src.api.info.schemas import ReferralCodeInfo, UserInfo
+from src.api.info.service import EmailHunter, InfoService, ReceiveCodeEmailService
 
 info_router = APIRouter(prefix='/auth', tags=['INFO'])
 
@@ -23,10 +23,11 @@ async def check_email_with_emailhunter(service: EmailHunter = Depends()) -> dict
 )
 async def receive_code_by_email(
     email: str,
+    background_tasks: BackgroundTasks,
     service: ReceiveCodeEmailService = Depends()
 ) -> ReferralCodeInfo:
     try:
-        return await service.get_code(email.strip())
+        return await service.get_code(email.strip(), background_tasks)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -42,10 +43,11 @@ async def receive_code_by_email(
 )
 async def get_info_about_referrals(
     id: str,
+    background_tasks: BackgroundTasks,
     service: InfoService = Depends(),
 ) -> list[UserInfo]:
     try:
-        return await service.about_referrals(id.strip())
+        return await service.about_referrals(id.strip(), background_tasks)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
