@@ -4,7 +4,7 @@ from Crypto.PublicKey import RSA
 
 certsfolder = Path('certs/').exists()
 if not certsfolder:
-    certsfolder = Path('certs/').mkdir()  # type: ignore
+    Path('certs/').mkdir()
 
 
 def generate(bit_size):

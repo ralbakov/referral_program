@@ -13,8 +13,8 @@ from src.database.config import get_async_session
 from src.database.models import Base
 
 # # used on local
-# create_database(settings.db.create_db_url + '_test') # used on local
-# engine = create_async_engine(settings.db.url + '_test', poolclass=NullPool) # used on local
+# create_database(settings.db.create_db_url + '_test')  # used on local
+# engine = create_async_engine(settings.db.url + '_test', poolclass=NullPool)  # used on local
 
 # used on docker
 engine = create_async_engine(settings.db.url, poolclass=NullPool)

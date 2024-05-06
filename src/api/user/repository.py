@@ -48,7 +48,10 @@ class UserRepository:
         '''Создать реферальный код'''
         now = datetime.now()
         if user.referal_code and user.exp_ref_code > now:
-            raise ValueError(f" Refarral code alredy exist. Your code: '{user.referal_code}' ")
+            raise ValueError(
+                f" Refarral code alredy exist. "
+                f"Your code: '{user.referal_code}' "
+            )
         if expire_timedelta_day:
             expire = now + timedelta(days=expire_timedelta_day)
         else:

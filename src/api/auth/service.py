@@ -50,7 +50,7 @@ class UserAuthService:
         self.form_data = form_data
         self.cache_repo = RedisCache()
 
-    async def validate_auth_user(self, background_tasks: BackgroundTasks) -> User:
+    async def validate_auth_user(self, background_tasks: BackgroundTasks = BackgroundTasks()) -> User:
         '''Проверка данных пользователя'''
         user = await self.repository.read(self.form_data.username.strip())
         if not user:
@@ -74,10 +74,9 @@ class TokenService:
 
     def __init__(
         self,
-        background_tasks: BackgroundTasks,
         user: UserAuthService = Depends()
     ):
-        self.__user = user.validate_auth_user(background_tasks)
+        self.__user = user.validate_auth_user()
 
     async def create_access_jwt(self) -> Token:
         '''Создать токен'''
@@ -117,7 +116,7 @@ class CurrentSessionService:
             raise InvalidTokenError(f'Invalid token error: {e}')
         return payload
 
-    async def get_auth_user(self, background_tasks: BackgroundTasks) -> User:
+    async def get_auth_user(self, background_tasks: BackgroundTasks = BackgroundTasks()) -> User:
         '''Проверить авторизацию пользователя'''
         payload = await self.get_token_payload()
         username: str | None = payload.get('username')
@@ -132,9 +131,9 @@ class CurrentSessionService:
             return user
         raise InvalidTokenError('Invalid token error: User not found')
 
-    async def get_active_auth_user(self, background_tasks: BackgroundTasks) -> User:
+    async def get_active_auth_user(self) -> User:
         '''Проверить активен ли пользователь'''
-        user = await self.get_auth_user(background_tasks)
+        user = await self.get_auth_user()
         if user.is_active:
             return user
         raise ValueError('User not found')

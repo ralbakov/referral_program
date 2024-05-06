@@ -13,11 +13,10 @@ class UserService:
     __slots__ = ['user', 'repository', 'cache_repo']
 
     def __init__(self,
-                 background_tasks: BackgroundTasks,
                  current: CurrentSessionService = Depends(),
                  repository: UserRepository = Depends(),
                  ) -> None:
-        self.user = current.get_active_auth_user(background_tasks)
+        self.user = current.get_active_auth_user()
         self.repository = repository
         self.cache_repo = RedisCache()
 
